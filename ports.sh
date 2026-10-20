@@ -45,22 +45,40 @@ listeners="$(
     }' | sort -n
 )"
 
-# 2. docker のコンテナ（"ホスト側のポート<TAB>コンテナ名<TAB>compose のフォルダ<TAB>compose のプロジェクト名"）。
-#    docker が応答するときだけ。compose で立てたものでなければ、後ろの 2 つは空になる。
+# 2. docker のコンテナ（"ホスト側のポート<TAB>コンテナ名<TAB>フォルダ<TAB>compose のプロジェクト名"）。
+#    docker が応答するときだけ。フォルダは compose を実行したフォルダ。そのラベルがないコンテナ
+#    （worktree で立てたものなど）は、$HOME の下にある最初のバインドマウントのフォルダを使う。
 DOCKER="$(command -v docker)"
 containers=""
 if [ -n "$DOCKER" ]; then
+  ps_out="$("$DOCKER" ps --format '{{.Names}}	{{.Ports}}	{{.Label "com.docker.compose.project.working_dir"}}	{{.Label "com.docker.compose.project"}}' 2>/dev/null)"
+  # フォルダのラベルがないコンテナだけ、docker inspect でバインドマウントを調べる（"コンテナ名<TAB>マウント元..."）
+  missing="$(printf '%s\n' "$ps_out" | awk -F'\t' '$1 != "" && $3 == "" { print $1 }')"
+  mounts=""
+  if [ -n "$missing" ]; then
+    # shellcheck disable=SC2086
+    mounts="$("$DOCKER" inspect --format '{{.Name}}{{range .Mounts}}{{if eq .Type "bind"}}	{{.Source}}{{end}}{{end}}' $missing 2>/dev/null)"
+  fi
   # 例: "0.0.0.0:8004->3000/tcp, [::]:8004->3000/tcp"、"0.0.0.0:8000-8001->8000-8001/tcp"
   containers="$(
-    "$DOCKER" ps --format '{{.Names}}	{{.Ports}}	{{.Label "com.docker.compose.project.working_dir"}}	{{.Label "com.docker.compose.project"}}' 2>/dev/null | awk -F'\t' '
-      {
-        n = split($2, maps, ", ")
+    {
+      printf '%s\n' "$mounts" | sed 's/^/M\t/'
+      printf '%s\n' "$ps_out" | sed 's/^/P\t/'
+    } | awk -F'\t' -v home="$HOME/" '
+      $1 == "M" {
+        name = $2; sub(/^\//, "", name)
+        for (i = 3; i <= NF; i++) if (index($i, home) == 1) { mdir[name] = $i; break }
+        next
+      }
+      $1 == "P" && $2 != "" {
+        dir = ($4 != "") ? $4 : mdir[$2]
+        n = split($3, maps, ", ")
         for (i = 1; i <= n; i++) {
           if (maps[i] !~ /->/) continue
           host = maps[i]; sub(/->.*/, "", host); sub(/.*:/, "", host)
           lo = host; hi = host
           if (host ~ /-/) { split(host, r, "-"); lo = r[1]; hi = r[2] }
-          for (p = lo; p <= hi; p++) if (!seen[p]++) printf "%s\t%s\t%s\t%s\n", p, $1, $3, $4
+          for (p = lo; p <= hi; p++) if (!seen[p]++) printf "%s\t%s\t%s\t%s\n", p, $2, dir, $5
         }
       }'
   )"
@@ -145,7 +163,7 @@ while IFS="$US" read -r port pid cmd cwd container compose_dir compose_project; 
     project="$compose_project"
     [ -d "$compose_dir" ] && project_of "$compose_dir"
     owner="$container${project:+ · $project} (docker)"
-    tooltip="docker: $container / ${compose_dir:-no compose} / PID $pid ($cmd)"
+    tooltip="docker: $container / ${compose_dir:-?} / PID $pid ($cmd)"
     stop_action="bash=$DOCKER param1=stop param2=$container terminal=false refresh=true"
     is_dev=1
   else
@@ -171,7 +189,9 @@ while IFS="$US" read -r port pid cmd cwd container compose_dir compose_project; 
   if [ "$is_dev" = 1 ]; then
     dev_count=$((dev_count + 1))
     # 開発用の行はサブメニューにして、view（ブラウザで開く）と kill（止める）を並べる
-    dev_lines+="$label | $tooltip font=Menlo"$'\n'
+    # 親の行にも動作（refresh）を付ける。動作のない行は、SwiftBar が一覧を作り直したときに
+    # グレーの押せない行になり、サブメニューが開けなくなる。サブメニューのある行は、クリックしても動作は起きない。
+    dev_lines+="$label | refresh=true $tooltip font=Menlo"$'\n'
     dev_lines+="--view | $open_action"$'\n'
     dev_lines+="--kill | $stop_action"$'\n'
   else
