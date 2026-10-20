@@ -188,11 +188,10 @@ while IFS="$US" read -r port pid cmd cwd container compose_dir compose_project; 
   tooltip="tooltip=\"$cleaned\""
   if [ "$is_dev" = 1 ]; then
     dev_count=$((dev_count + 1))
-    # 開発用の行はサブメニューにして、view（ブラウザで開く）と kill（止める）を並べる
-    # 親の行にも動作（refresh）を付ける。動作のない行は、SwiftBar が一覧を作り直したときに
-    # グレーの押せない行になり、サブメニューが開けなくなる。サブメニューのある行は、クリックしても動作は起きない。
-    dev_lines+="$label | refresh=true $tooltip font=Menlo"$'\n'
-    dev_lines+="--view | $open_action"$'\n'
+    # 開発用の行は、クリックでブラウザで開き、サブメニューの kill で止める。
+    # 親の行に動作がないと、SwiftBar が一覧を作り直したときにグレーの押せない行になり、
+    # サブメニューも開けなくなるので、親の行には必ず動作（ここでは開く）を付ける。
+    dev_lines+="$label | $open_action $tooltip font=Menlo"$'\n'
     dev_lines+="--kill | $stop_action"$'\n'
   else
     other_count=$((other_count + 1))

@@ -7,8 +7,8 @@ localhost で待ち受け中のポートを、macOS のメニューバーに一�
 ```
 🌐 3
 ──────────────────────────────────────────
-:3000   api · my-app (docker)     ▸ │ view
-:4321   node · my-portfolio       ▸ │ kill
+:3000   api · my-app (docker)     ▸ │ kill
+:4321   node · my-portfolio       ▸
 :5173   node · my-app             ▸
 ──────────────────────────────────────────
 Other (12)                        ▸
@@ -45,12 +45,10 @@ cd swiftbar-ports
 
 ## 使い方
 
-開発用の行にカーソルを合わせると、サブメニューに `view` と `kill` が出ます。
-
 | 操作 | 動き |
 |---|---|
-| `view` | `http://localhost:<ポート>` をデフォルトのブラウザで開く |
-| `kill` | そのポートを止める。普通のプロセスは `kill <PID>`（SIGTERM）、docker のコンテナは `docker stop <コンテナ名>`。止めたら一覧を更新する |
+| 開発用の行をクリック | `http://localhost:<ポート>` をデフォルトのブラウザで開く |
+| サブメニューの `kill` | そのポートを止める。普通のプロセスは `kill <PID>`（SIGTERM）、docker のコンテナは `docker stop <コンテナ名>`。止めたら一覧を更新する |
 | 行にホバー | 詳細（PID・コマンド・作業ディレクトリ、docker ならコンテナ名と compose のフォルダ）を出す |
 
 - `Other` の行は、クリックでブラウザで開くだけです。macOS のシステムプロセスなどを誤って止めないよう、`kill` は付けていません。
